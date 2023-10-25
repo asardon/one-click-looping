@@ -1,6 +1,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.optimize import fsolve
 
 def calculate_open_position(current_price_coll_token, current_price_loan_token, user_init_coll_amount, ltv, apr, upfront_fee, tenor, myso_fee, dex_slippage, dex_swap_fee):
     cross_price = current_price_coll_token / current_price_loan_token
@@ -77,15 +78,15 @@ with st.sidebar:
     expected_price_move_loan_token = st.number_input(f"Input {loan_token_name} price change you expect during loan tenor*", min_value=-1.0, max_value=10.0, value=0.0)
 
     st.header("Loan Parameters")
-    ltv = st.number_input("LTV", min_value=0.0, max_value=1.0, value=0.8)
+    ltv = st.number_input("LTV", min_value=0.01, max_value=1.0, value=0.8)
     tenor = st.number_input("Tenor* (in days)", min_value=1, max_value=365, value=5)
     apr = st.number_input("APR", min_value=0.0, max_value=1.0, value=0.05)
     upfront_fee = st.number_input("Upfront Fee", min_value=0.0, max_value=1.0, value=0.0, format="%.4f")
-    myso_fee = st.number_input("Myso Protocol Fee", value=0.002, format="%.4f")
+    myso_fee = st.number_input("MYSO Protocol Fee", min_value=0.0, value=0.002, max_value=1.0, format="%.4f")
 
     st.header("DEX Assumptions")
     dex_slippage = st.number_input("DEX Slippage", min_value=0.0, max_value=1.0, value=0.005, format="%.4f")
-    dex_swap_fee = st.number_input("DEX Swap Fee", min_value=0.0, max_value=1.0, value=0.01, format="%.4f")
+    dex_swap_fee = st.number_input("DEX Swap Fee", min_value=0.0, max_value=1.0, value=0.0025, format="%.4f")
 
     st.header("Gas Price Assumptions")
     gas_used = st.number_input("Gas Used (full round trip)", min_value=0, max_value=100000000, value=1200000)
@@ -127,10 +128,17 @@ for i in range(101):
     rel_price_changes.append(p1/current_price_coll_token-1)
     RoIs.append(final_amount_after_close2 * p2 / (current_price_coll_token * user_init_coll_amount) - 1)
 
+def roi_function(price_multiplier):
+    p1 = current_price_coll_token / current_price_loan_token * price_multiplier
+    p2 = current_price_loan_token
+    _, _, _, final_amount_after_close2, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_price)
+    roi = final_amount_after_close2 * p2 / (current_price_coll_token * user_init_coll_amount) - 1
+    return roi
 
-# Find the break-even point
-break_even_index = np.argmin(np.abs(np.array(RoIs)))
-break_even_price_change = rel_price_changes[break_even_index] * 100
+# Use fsolve to find the root of the roi_function
+break_even_multiplier = fsolve(roi_function, 1.0)[0]
+break_even_price_change = (break_even_multiplier - 1) * 100
+
 
 # Create the figure and axes
 fig, ax = plt.subplots(figsize=(10, 5))
@@ -168,7 +176,7 @@ roi = final_amount_after_close2 / (current_price_coll_token * user_init_coll_amo
 st.markdown(f"### **Summary**")
 st.text(f"Initial Position: {user_init_coll_amount:,.2f} {collateral_token_name} (${user_init_coll_amount*current_price_coll_token:,.2f})")
 st.text(f"Leverage: {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x")
-st.text(f"Break even price change: {break_even_price_change:,.2f}x")
+st.text(f"Break even price change: {break_even_price_change:,.2f}%")
 st.text(f"Assumed {collateral_token_name}/{loan_token_name} price change: {final_price_coll_token/current_price_coll_token/(final_price_loan_token/current_price_loan_token)*100-100:,.2f}%")
 st.text(f"Resulting Closing Position: {final_amount_after_close2:,.2f} {loan_token_name} (${final_amount_after_close2*final_price_loan_token:,.2f})")
 st.text(f"Resulting RoI: {100*final_amount_after_close2*final_price_loan_token/(user_init_coll_amount*current_price_coll_token)-100:,.2f}%")
