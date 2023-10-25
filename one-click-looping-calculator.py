@@ -86,7 +86,7 @@ with st.sidebar:
 
     st.header("DEX Assumptions")
     dex_slippage = st.number_input("DEX Slippage", min_value=0.0, max_value=1.0, value=0.005, format="%.4f")
-    dex_swap_fee = st.number_input("DEX Swap Fee", min_value=0.0, max_value=1.0, value=0.0025, format="%.4f")
+    dex_swap_fee = st.number_input("DEX Swap Fee", min_value=0.0, max_value=1.0, value=0.0005, format="%.4f")
 
     st.header("Gas Price Assumptions")
     gas_used = st.number_input("Gas Used (full round trip)", min_value=0, max_value=100000000, value=1200000)
