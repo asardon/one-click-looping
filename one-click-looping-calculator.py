@@ -110,7 +110,7 @@ min_price_change_percent = st.slider(
 )
 
 max_price_change_percent = st.slider(
-    'fSet the max range for {collateral_token_name}/{loan_token_name} price changes (%):', 
+    f'Set the max range for {collateral_token_name}/{loan_token_name} price changes (%):', 
     min_value=min_price_change_percent,  # Ensures max is always >= min
     max_value=200,  # you can adjust this upper limit based on your requirements
     value=100  # default value
