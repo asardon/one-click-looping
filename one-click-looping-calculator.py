@@ -161,7 +161,7 @@ if price_change_range[0] < break_even_price_change and break_even_price_change <
     ax.annotate(f'If price {tmp}%:\nBreak-even', 
                 (break_even_price_change, min(RoIs)*100), 
                 textcoords="offset points", 
-                xytext=(0, -80),  # This offsets the annotation below the x-axis
+                xytext=(0, -90),  # This offsets the annotation below the x-axis
                 ha='center',
                 va='top',  # This aligns the top of the text to the xytext
                 arrowprops=dict(arrowstyle="->", linestyle='dotted', lw=0.8, color='green'))
@@ -201,7 +201,7 @@ st.pyplot(fig)
 
 
 # List of predefined price changes
-price_changes = [-5, -1, 0, 1, 5, 10, 15, 20, 30]
+price_changes = [-5, -2, -1, 0, 1, 2, 3, 4, 5, 10, 15, 20]
 
 # Compute RoIs for each price change
 rois_for_changes = [(price, roi_function(1 + price/100) * 100) for price in price_changes]
@@ -262,7 +262,7 @@ st.write(f"""Below you can see potential outcomes when looping with MYSO. Your R
 styled_df = df.style.apply(highlight_special_points)
 st.table(styled_df)
 st.write(f"""
-    Looping with MYSO effectively sets up a leveraged call option on {collateral_token_name}/{loan_token_name}. Unlike perpetuals, there's no risk of liquidation. This means that even if the {collateral_token_name}/{loan_token_name} price drops sharply but later rebounds, you still benefit from the full upside. In a similar situation, a perpetual might be liquidated early, causing a loss.
+    Looping with MYSO effectively sets up a leveraged call option on {collateral_token_name}/{loan_token_name}, where you essentially pay with your initially provided {collateral_token_name} balance. Given a {ltv*100:.1f}% LTV, this results in a {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x leveraged {collateral_token_name} position. Unlike perpetuals, there's no risk of liquidation, meaning that even if the {collateral_token_name}/{loan_token_name} price drops sharply but later rebounds, you still benefit from the full upside. In a similar situation, a perpetual might be liquidated early, causing a loss. However, there's no guarantee that your leveraged call option will be in-the-money, in particular if the price drops by {total_loss_price_change:.2f}% you will lose all of your {collateral_token_name}.
 
     A few key points to understand:
     
@@ -295,7 +295,7 @@ Based on a {collateral_token_name}/{loan_token_name} price change of {final_pric
 **Detailed Breakdown:**
 - **Initial Commitment:** You began your MYSO looping journey with a position of {user_init_coll_amount:,.2f} {collateral_token_name}, equivalent to ${user_init_coll_amount*current_price_coll_token:,.2f}.
   
-- **Leverage Effect:** Through leveraging, you magnified this position to {final_pledge_and_reclaimable/user_init_coll_amount:,.2f} times its initial size.
+- **Leverage Effect:** Through leveraging, you magnified this position to {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x times its initial size.
 
 - **Projected Closing Position:** If the price change materializes as hypothesized, it would be rational for you to {"repay and unwind your looping position" if final_amount_after_close2 > 0 else "default and leave your looping position expire"}, hence your closing position would be {final_amount_after_close2:,.2f} {loan_token_name}, equivalent to ${final_amount_after_close2*final_price_loan_token:,.2f}.
 """) 
