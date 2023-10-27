@@ -420,12 +420,12 @@ data = {
         "-",
         "-",
         "-",
-        f"+{flashloan_amount2:,.2f} {collateral_token_name} (${flashloan_amount2*current_price_loan_token:,.2f})",
-        f"-{sold_on_dex2:,.2f} {collateral_token_name} (${sold_on_dex2*current_price_loan_token:,.2f})",
-        f"+{received_from_dex2:,.2f} {loan_token_name} (${received_from_dex2*current_price_coll_token:,.2f})",
-        f"-{owed_repayment:,.2f} {loan_token_name} (${owed_repayment*current_price_coll_token:,.2f})",
-        f"+{final_amount_after_close2:,.2f} {loan_token_name} (${final_amount_after_close2*current_price_coll_token:,.2f})",
-        f"{final_amount_after_close2*current_price_coll_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%"
+        f"+{flashloan_amount2:,.2f} {collateral_token_name} (${flashloan_amount2*current_price_coll_token:,.2f})",
+        f"-{sold_on_dex2:,.2f} {collateral_token_name} (${sold_on_dex2*current_price_coll_token:,.2f})",
+        f"+{received_from_dex2:,.2f} {loan_token_name} (${received_from_dex2*current_price_loan_token:,.2f})",
+        f"-{owed_repayment:,.2f} {loan_token_name} (${owed_repayment*current_price_loan_token:,.2f})",
+        f"+{final_amount_after_close2:,.2f} {loan_token_name} (${final_amount_after_close2*current_price_loan_token:,.2f})",
+        f"{final_amount_after_close2*current_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%"
     ]
 }
 
@@ -441,7 +441,7 @@ st.write(f"""
 
 - **Unwinding Position:** If the price change unfolds as anticipated, it would be rational for you to {f"repay and unwind your looping position, given that your {collateral_token_name} leveraged collateral exceeds your {loan_token_name} debt" if final_amount_after_close2 > 0 else f"default and let your looping position expire, as your {collateral_token_name} leveraged collateral is valued less than your {loan_token_name} debt owed"}.
 
-- **Final Position:** Consequently, your end position would be {final_amount_after_close2:,.2f} {loan_token_name} (equivalent to ${final_amount_after_close2*final_price_loan_token:,.2f}), yielding an RoI of {final_amount_after_close2*current_price_coll_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%.
+- **Final Position:** Consequently, your end position would be {final_amount_after_close2:,.2f} {loan_token_name} (equivalent to ${final_amount_after_close2*final_price_loan_token:,.2f}), yielding an RoI of {final_amount_after_close2*final_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%.
 """)
 
 
