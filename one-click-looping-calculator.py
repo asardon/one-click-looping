@@ -1,19 +1,36 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, minimize
+
+def find_flashloan_amount(flashloan_amount, user_init_coll_amount, cross_price, ltv, dex_slippage, dex_swap_fee, upfront_fee):
+    sold_on_dex = flashloan_amount
+    received_from_dex = sold_on_dex / cross_price * (1 - dex_slippage - dex_swap_fee)
+
+    combined_pledge = user_init_coll_amount + received_from_dex
+
+    upfront_fee_abs = combined_pledge * upfront_fee
+
+    flashloan_amount_act = (combined_pledge - upfront_fee_abs) * cross_price * ltv
+
+    return (flashloan_amount - flashloan_amount_act)**2
 
 def calculate_open_position(current_price_coll_token, current_price_loan_token, user_init_coll_amount, ltv, apr, upfront_fee, tenor, myso_fee, dex_slippage, dex_swap_fee):
     cross_price = current_price_coll_token / current_price_loan_token
     
     # Calculate flashloan amount
-    flashloan_amount = user_init_coll_amount * cross_price / (1 - ltv)
+    flashloan_amount_guess = user_init_coll_amount * cross_price / (1 - ltv)
+    res = minimize(
+            find_flashloan_amount,
+            args=(user_init_coll_amount, cross_price, ltv, dex_slippage, dex_swap_fee, upfront_fee),
+            x0=[flashloan_amount_guess])
+    flashloan_amount_act = res["x"][0]
 
     # Calculate owed repayment amount
-    owed_repayment = flashloan_amount * (1 + apr * tenor/365)
+    owed_repayment = flashloan_amount_act * (1 + apr * tenor/365)
 
     # Amount that's sold on the DEX 
-    sold_on_dex = flashloan_amount
+    sold_on_dex = flashloan_amount_act
 
     # Amount received from the DEX (after considering slippage and swap fee)
     received_from_dex = sold_on_dex / cross_price * (1 - dex_slippage - dex_swap_fee)
@@ -30,7 +47,7 @@ def calculate_open_position(current_price_coll_token, current_price_loan_token, 
     final_pledge_and_reclaimable = combined_pledge - upfront_fee_abs - myso_fee_abs
 
     # Return results
-    return flashloan_amount, owed_repayment, sold_on_dex, received_from_dex, combined_pledge, upfront_fee_abs, myso_fee_abs, final_pledge_and_reclaimable
+    return flashloan_amount_act, owed_repayment, sold_on_dex, received_from_dex, combined_pledge, upfront_fee_abs, myso_fee_abs, final_pledge_and_reclaimable
 
 def calculate_close_position(final_pledge_and_reclaimable, owed_repayment, final_price_coll_token, final_price_loan_token, dex_slippage, dex_swap_fee, gas_usd_cost):
     cross_price = final_price_coll_token / final_price_loan_token
