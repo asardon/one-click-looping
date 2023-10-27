@@ -74,7 +74,7 @@ default_user_init_coll_amount = 100.
 default_current_price_coll_token = 0.38
 default_loan_token_name = "USDT"
 default_current_price_loan_token = 1.
-default_ltv = 0.92
+default_ltv = 0.9200
 default_tenor = 7
 default_apr = 0.12
 default_upfront_fee = 0.
@@ -99,7 +99,7 @@ with st.sidebar:
         st.code(f"1 {collateral_token_name} = {current_price_coll_token/current_price_loan_token} {loan_token_name}")
 
     with st.expander("**Your Loan Terms**", expanded=True):
-        ltv = st.number_input("LTV", min_value=0.01, max_value=1.0, value=get_param_value("ltv", default_ltv, float))
+        ltv = st.number_input("LTV", min_value=0.01, max_value=1.0, value=get_param_value("ltv", default_ltv, float), format="%.4f")
         tenor = st.number_input("Tenor* (in days)", min_value=1, max_value=365, value=get_param_value("tenor", default_tenor, int))
         apr = st.number_input("APR", min_value=0.0, max_value=1.0, value=get_param_value("apr", default_apr, float))
         upfront_fee = st.number_input("Upfront Fee", min_value=0.0, max_value=1.0, value=get_param_value("upfront_fee", default_upfront_fee, float), format="%.4f")
