@@ -93,7 +93,7 @@ default_loan_token_name = "USDT"
 default_current_price_loan_token = 1.
 default_ltv = 0.9200
 default_tenor = 7
-default_apr = 0.12
+default_apr = 0.1200
 default_upfront_fee = 0.
 default_myso_fee = 0.0008
 default_dex_slippage = 0.0008
@@ -101,6 +101,7 @@ default_dex_swap_fee = 0.0005
 default_gas_used = 1200000
 default_gas_price = 20
 default_eth_price = 0.3
+default_expected_price_move_coll_token = 0.05
 
 with st.sidebar:
     st.title("User Input")
@@ -118,7 +119,7 @@ with st.sidebar:
     with st.expander("**Your Loan Terms**", expanded=True):
         ltv = st.number_input("LTV", min_value=0.01, max_value=1.0, value=get_param_value("ltv", default_ltv, float), format="%.4f")
         tenor = st.number_input("Tenor* (in days)", min_value=1, max_value=365, value=get_param_value("tenor", default_tenor, int))
-        apr = st.number_input("APR", min_value=0.0, max_value=1.0, value=get_param_value("apr", default_apr, float))
+        apr = st.number_input("APR", min_value=0.0, max_value=1.0, value=get_param_value("apr", default_apr, float), format="%.4f")
         upfront_fee = st.number_input("Upfront Fee", min_value=0.0, max_value=1.0, value=get_param_value("upfront_fee", default_upfront_fee, float), format="%.4f")
         myso_fee = st.number_input("MYSO Protocol Fee", min_value=0.0, value=get_param_value("myso_fee", default_myso_fee, float), max_value=1.0, format="%.4f")
 
@@ -133,7 +134,7 @@ with st.sidebar:
         gas_usd_cost = gas_used * gas_price / 10**9 * eth_price
         st.code(f"Gas Cost in USD: ${gas_usd_cost:,.2f}")
 
-    with st.expander("**Advanced: Share your input with this link**", expanded=True):
+    with st.expander("**Advanced: Share your input with this link**"):
         # Create a dictionary of all input values
         input_values = {
             "collateral_token_name": collateral_token_name,
@@ -351,9 +352,9 @@ st.write(f"""### How Does Looping Work?""")
 st.write(f"""
 Looping with MYSO enables users to create a leveraged position, amplifying the potential returns of their base assets. Below you can see the individual steps involved in the looping process, illuminating what occurs behind the scenes. 
 
-Below, you can input an expected price change for the {collateral_token_name}/{loan_token_name} pair to receive a step-by-step breakdown tailored to that specific price scenario.""")
+Enter your expected price appreciation for {collateral_token_name} compared to {loan_token_name} over the loan duration of {tenor} days below. You'll receive a detailed breakdown tailored to that specific price scenario.""")
 
-expected_price_move_coll_token = st.number_input(f"**Expected {collateral_token_name}/{loan_token_name} price change:**", min_value=-1.0, max_value=10.0, value=0.05, format="%.4f")
+expected_price_move_coll_token = st.number_input(f"**Expected {collateral_token_name}/{loan_token_name} price change (in next {tenor} days):**", min_value=-1.0, max_value=10.0, value=get_param_value("expected_price_move_coll_token", default_expected_price_move_coll_token, float), format="%.4f")
 
 final_price_coll_token = current_price_coll_token * (1 + expected_price_move_coll_token)
 final_price_loan_token = current_price_loan_token
@@ -393,7 +394,9 @@ data = {
         f"{loan_token_name} received from DEX",
         f"Repayment of {loan_token_name}",
         f"Remaining {loan_token_name} after Repayment",
-        f"Final RoI"
+        f"Final RoI",
+        f"Gas costs",
+        f"Final RoI (net gas costs)",
     ],
     'Open Position Amount': [
         f"{user_init_coll_amount:,.2f} {collateral_token_name} (${user_init_coll_amount*current_price_coll_token:,.2f})",
@@ -404,6 +407,8 @@ data = {
         f"-{upfront_fee_abs + myso_fee_abs:,.2f} {collateral_token_name} (${(upfront_fee_abs + myso_fee_abs)*current_price_coll_token:,.2f})",
         f"+{final_pledge_and_reclaimable:,.2f} {collateral_token_name} (${final_pledge_and_reclaimable*current_price_coll_token:,.2f})",
         f"{final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x",
+        "-",
+        "-",
         "-",
         "-",
         "-",
@@ -425,7 +430,9 @@ data = {
         f"+{received_from_dex2:,.2f} {loan_token_name} (${received_from_dex2*current_price_loan_token:,.2f})",
         f"-{owed_repayment:,.2f} {loan_token_name} (${owed_repayment*current_price_loan_token:,.2f})",
         f"+{final_amount_after_close2:,.2f} {loan_token_name} (${final_amount_after_close2*current_price_loan_token:,.2f})",
-        f"{final_amount_after_close2*current_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%"
+        f"{final_amount_after_close2*current_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%",
+        f"-${gas_usd_cost:,.2f}",
+        f"{(final_amount_after_close2*current_price_loan_token-gas_usd_cost)/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%"
     ]
 }
 
@@ -517,3 +524,30 @@ ax.set_ylim(0, max(values)*1.2)  # Add some space at the top for annotations
 # Display the bar chart in Streamlit
 st.pyplot(fig)
 
+
+st.write(f"""Note: You can share the calculated scenario using this link""")
+input_values = {
+    "collateral_token_name": collateral_token_name,
+    "user_init_coll_amount": user_init_coll_amount,
+    "current_price_coll_token": current_price_coll_token,
+    "loan_token_name": loan_token_name,
+    "current_price_loan_token": current_price_loan_token,
+    "ltv": ltv,
+    "tenor": tenor,
+    "apr": apr,
+    "upfront_fee": upfront_fee,
+    "myso_fee": myso_fee,
+    "dex_slippage": dex_slippage,
+    "dex_swap_fee": dex_swap_fee,
+    "gas_used": gas_used,
+    "gas_price": gas_price,
+    "eth_price": eth_price,
+    "expected_price_move_coll_token": expected_price_move_coll_token
+}
+
+# Convert the dictionary to a query string
+query_string2 = "&".join([f"{key}={value}" for key, value in input_values.items()])
+shareable_link2 = base_url + "?" + query_string2
+
+# Display the shareable link in a code block
+st.code(shareable_link2)
