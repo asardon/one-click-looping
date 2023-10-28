@@ -1,7 +1,8 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.optimize import fsolve, minimize
+from scipy.optimize import bisect, minimize
+import numpy as np
 
 def find_flashloan_amount(flashloan_amount, user_init_coll_amount, cross_price, ltv, dex_slippage, dex_swap_fee, upfront_fee):
     sold_on_dex = flashloan_amount
@@ -49,7 +50,7 @@ def calculate_open_position(current_price_coll_token, current_price_loan_token, 
     # Return results
     return flashloan_amount_act, owed_repayment, sold_on_dex, received_from_dex, combined_pledge, upfront_fee_abs, myso_fee_abs, final_pledge_and_reclaimable
 
-def calculate_close_position(final_pledge_and_reclaimable, owed_repayment, final_price_coll_token, final_price_loan_token, dex_slippage, dex_swap_fee, gas_usd_cost):
+def calculate_close_position(final_pledge_and_reclaimable, owed_repayment, final_price_coll_token, final_price_loan_token, dex_slippage, dex_swap_fee, gas_usd_cost, always_repay=False):
     cross_price = final_price_coll_token / final_price_loan_token
     
     # Amount flashborrowed
@@ -66,7 +67,7 @@ def calculate_close_position(final_pledge_and_reclaimable, owed_repayment, final
     final_amount_after_close_net_of_gas_fees = final_amount_after_close - gas_usd_cost
 
     # Myso protocol fee
-    rational_to_repay = final_amount_after_close > 0
+    rational_to_repay = always_repay if always_repay else final_amount_after_close > 0
 
     if not rational_to_repay:
         flashloan_amount = 0 
@@ -85,6 +86,7 @@ def get_param_value(key, default, data_type):
         return data_type(params.get(key, [default])[0])
     except ValueError:  # Handle parsing issues
         return default
+
 params = st.experimental_get_query_params()
 default_collateral_token_name = "WMNT"
 default_user_init_coll_amount = 100.
@@ -101,6 +103,8 @@ default_dex_swap_fee = 0.0005
 default_gas_used = 1200000
 default_gas_price = 20
 default_eth_price = 0.3
+default_price_move_from = -5.
+default_price_move_to = 10.
 default_expected_price_move_coll_token = 0.05
 
 with st.sidebar:
@@ -134,64 +138,25 @@ with st.sidebar:
         gas_usd_cost = gas_used * gas_price / 10**9 * eth_price
         st.code(f"Gas Cost in USD: ${gas_usd_cost:,.2f}")
 
-    with st.expander("**Advanced: Share your input with this link**"):
-        # Create a dictionary of all input values
-        input_values = {
-            "collateral_token_name": collateral_token_name,
-            "user_init_coll_amount": user_init_coll_amount,
-            "current_price_coll_token": current_price_coll_token,
-            "loan_token_name": loan_token_name,
-            "current_price_loan_token": current_price_loan_token,
-            "ltv": ltv,
-            "tenor": tenor,
-            "apr": apr,
-            "upfront_fee": upfront_fee,
-            "myso_fee": myso_fee,
-            "dex_slippage": dex_slippage,
-            "dex_swap_fee": dex_swap_fee,
-            "gas_used": gas_used,
-            "gas_price": gas_price,
-            "eth_price": eth_price
-        }
-
-        # Convert the dictionary to a query string
-        query_string = "&".join([f"{key}={value}" for key, value in input_values.items()])
-
-        base_url = "one-click-looping.streamlit.app/"  # Change this to your app's base URL
-        shareable_link = base_url + "?" + query_string
-
-        # Display the shareable link in a code block
-        st.code(shareable_link)
-
-
 flashloan_amount, owed_repayment, sold_on_dex, received_from_dex, combined_pledge, upfront_fee_abs, myso_fee_abs, final_pledge_and_reclaimable = calculate_open_position(
     current_price_coll_token, current_price_loan_token, user_init_coll_amount, ltv, apr, upfront_fee, tenor, myso_fee, dex_slippage, dex_swap_fee
 )
 
+def calc_roi(final_loan_token_amount_after_close, final_loan_token_price, user_init_coll_amount, init_coll_token_price):
+    return final_loan_token_amount_after_close * final_loan_token_price / (user_init_coll_amount * init_coll_token_price) - 1
 
-def roi_function(price_multiplier):
-    p1 = current_price_coll_token * price_multiplier
+def calc_roi2(coll_usd_price_change, target_roi, current_price_coll_token, current_price_loan_token, final_pledge_and_reclaimable, owed_repayment, dex_slippage, dex_swap_fee, gas_usd_cost):
+    p1 = current_price_coll_token * (1 + coll_usd_price_change)
     p2 = current_price_loan_token
-    _, _, _, final_amount_after_close2, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_cost)
-    roi = final_amount_after_close2 * p2 / (current_price_coll_token * user_init_coll_amount) - 1
-    return roi
+    _, _, _, final_amount_after_close2, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_cost, True)
+    roi = calc_roi(final_amount_after_close2, p2, user_init_coll_amount, current_price_coll_token)
+    return roi - target_roi
 
-def roi_minus_100_function(price_multiplier):
-    p1 = current_price_coll_token / current_price_loan_token * price_multiplier
-    p2 = current_price_loan_token
-    _, _, _, final_amount_after_close2, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_cost)
-    roi = final_amount_after_close2 * p2 / (current_price_coll_token * user_init_coll_amount) - 1
-    return roi + 1  # Returns the difference between ROI and -100%
-
-
-# Using fsolve to find the root of roi_minus_100_function
-total_loss_multiplier = fsolve(roi_minus_100_function, 1.0)[0]
-total_loss_price_change = (total_loss_multiplier - 1) * 100
-
+total_loss_price_change = bisect(calc_roi2, -1., 2., args=(-1., current_price_coll_token, current_price_loan_token, final_pledge_and_reclaimable, owed_repayment, dex_slippage, dex_swap_fee, gas_usd_cost)) * 100
 
 st.write(f"""
     ### What is Looping?
-    Looping via MYSO lets you leverage {collateral_token_name} against {loan_token_name} up to {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x, based on a {ltv*100:.1f}% LTV. Essentially, you're creating a leveraged call option position. Compared to perpetuals, there's no liquidation risk, meaning even if the {collateral_token_name}/{loan_token_name} price plummets and later rises, you capture the full upside. But beware, a price drop of {total_loss_price_change:.2f}% wipes out your {collateral_token_name} stake.
+Using MYSO to loop allows you to leverage {collateral_token_name} against {loan_token_name} up to a ratio of {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x, based on an LTV (Loan to Value) of {ltv*100:.1f}%. In essence, you're establishing a leveraged call option position. Unlike perpetuals, there's no risk of liquidation. This means that even if the price of {collateral_token_name}/{loan_token_name} drops sharply, you still retain the full upside potential. However, caution is advised. If the price of {collateral_token_name}/{loan_token_name} decreases and remains below {total_loss_price_change:.2f}% throughout the entire duration of the loan, your leveraged {collateral_token_name} position will be worth less than the debt you owe. Consequently, you won't be able to recover your position and will face a complete, 100% loss.
 """)
 
 st.write(f"""
@@ -201,13 +166,15 @@ Below you can see potential outcomes when looping with MYSO. Your RoI will depen
 # Use a range slider to define the range for hypothetical price changes
 price_change_range = st.slider(
     f"**Define your expected price range for {collateral_token_name}/{loan_token_name} over the upcoming {tenor} days:**", 
-    min_value=-100,  # you can adjust this lower limit based on your requirements
-    max_value=100,   # you can adjust this upper limit based on your requirements
-    value=(-2, 5)
+    min_value=-100.,  # you can adjust this lower limit based on your requirements
+    max_value=100.,   # you can adjust this upper limit based on your requirements
+    value=(get_param_value("price_move_from", default_price_move_from, float), get_param_value("price_move_to", default_price_move_to, float)),
+    format="%.1f%%"  # Added the % sign after the float format
 )
 
 rel_price_changes = []
 RoIs = []
+rois_for_changes = []
 
 # Adjust the loop to take into account the user-defined range
 for i in range(101):
@@ -215,12 +182,15 @@ for i in range(101):
     p2 = current_price_loan_token
     _, _, _, final_amount_after_close2, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_cost)
     rel_price_changes.append(p1/current_price_coll_token-1)
-    RoIs.append(final_amount_after_close2 * p2 / (current_price_coll_token * user_init_coll_amount) - 1)
+    roi = calc_roi(final_amount_after_close2, p2, user_init_coll_amount, current_price_coll_token)
+    RoIs.append(roi)
+    if i % 10 == 0:
+        rois_for_changes.append(((p1/current_price_coll_token-1)*100, roi*100))
 
-roi_unchanged = roi_function(1.0) * 100
+_, _, _, final_amount_after_close3, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, current_price_coll_token, current_price_loan_token, dex_slippage, dex_swap_fee, gas_usd_cost)
+roi_unchanged = calc_roi(final_amount_after_close3, current_price_loan_token, user_init_coll_amount, current_price_coll_token) * 100
 
-break_even_multiplier = fsolve(roi_function, 1.0)[0]
-break_even_price_change = (break_even_multiplier - 1) * 100
+break_even_price_change = bisect(calc_roi2, -1., 2., args=(.0, current_price_coll_token, current_price_loan_token, final_pledge_and_reclaimable, owed_repayment, dex_slippage, dex_swap_fee, gas_usd_cost)) * 100
 
 # Create and customize the plot
 fig, ax = plt.subplots(figsize=(10, 5))
@@ -277,23 +247,29 @@ ax.legend(loc="upper left")
 st.pyplot(fig)
 
 
-# List of predefined price changes
-price_changes = [-5, -2, -1, 0, 1, 2, 3, 4, 5, 10, 15, 20]
+# add special points
+p1 = current_price_coll_token
+p2 = current_price_loan_token
+_, _, _, final_amount_after_close2, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_cost)
+rel_price_changes.append(p1/current_price_coll_token-1)
+roi = calc_roi(final_amount_after_close2, p2, user_init_coll_amount, current_price_coll_token)
+rois_for_changes.append(((p1/current_price_coll_token-1)*100, roi*100))
 
-# Compute RoIs for each price change
-rois_for_changes = [(price, roi_function(1 + price/100) * 100) for price in price_changes]
+p1 = current_price_coll_token * (1 + break_even_price_change/100)
+p2 = current_price_loan_token
+_, _, _, final_amount_after_close2, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_cost)
+rel_price_changes.append(p1/current_price_coll_token-1)
+roi = calc_roi(final_amount_after_close2, p2, user_init_coll_amount, current_price_coll_token)
+rois_for_changes.append(((p1/current_price_coll_token-1)*100, roi*100))
+
+p1 = current_price_coll_token * (1 + total_loss_price_change/100)
+p2 = current_price_loan_token
+_, _, _, final_amount_after_close2, _, _ = calculate_close_position(final_pledge_and_reclaimable, owed_repayment, p1, p2, dex_slippage, dex_swap_fee, gas_usd_cost)
+rel_price_changes.append(p1/current_price_coll_token-1)
+roi = calc_roi(final_amount_after_close2, p2, user_init_coll_amount, current_price_coll_token)
+rois_for_changes.append(((p1/current_price_coll_token-1)*100, roi*100))
 
 df = pd.DataFrame(rois_for_changes, columns=["Price Change (%)", "Looping RoI (%)"])
-
-# Expanded DataFrame to include price change bounds, break-even, flat scenario, and full loss
-additional_points = [
-    {"Price Change (%)": price_change_range[0], "Looping RoI (%)": roi_function(price_change_range[0]/100 + 1) * 100},
-    {"Price Change (%)": price_change_range[1], "Looping RoI (%)": roi_function(price_change_range[1]/100 + 1) * 100},
-    {"Price Change (%)": break_even_price_change, "Looping RoI (%)": 0},
-    {"Price Change (%)": 0, "Looping RoI (%)": roi_unchanged},
-    {"Price Change (%)": total_loss_price_change, "Looping RoI (%)": -100},
-]
-df = pd.concat([df, pd.DataFrame(additional_points)], ignore_index=True)
 df.drop_duplicates(inplace=True)
 df = df.sort_values(by="Price Change (%)", ascending=False)
 # Reset the index for proper numbering
@@ -313,15 +289,15 @@ def highlight_special_points(column):
         # For the "Price Change (%)" column, highlight additional points
         if column.name == "Price Change (%)":
             if value == round(break_even_price_change, 2) or value == 0 or value == round(total_loss_price_change, 2):
-                colors.append('background-color: yellow')
+                colors.append('background-color: lightgray; color: black')
             else:
                 colors.append('')
         # For the "RoI (%)" column, highlight positive RoI in green and negative RoI in red
         elif column.name == "Looping RoI (%)":
             if value >= 0:
-                colors.append('background-color: lightgreen')
+                colors.append('background-color: lightgreen; color: black')
             elif value < 0:
-                colors.append('background-color: lightcoral')
+                colors.append('background-color: lightcoral; color: black')
             else:
                 colors.append('')
         else:
@@ -339,13 +315,13 @@ st.write(f"""Above, you can view the RoI from looping (blue curve) based on diff
 styled_df = df.style.apply(highlight_special_points)
 st.table(styled_df)
 st.write(f"""
-    There are 3 important scenarios to be aware of (yellow shaded cells):
+    There are 3 important scenarios to be aware of (gray shaded rows):
     
     - **Break-even**: The price of {collateral_token_name}/{loan_token_name} needs to move by at least {"+" if break_even_price_change > 0 else ""}{break_even_price_change:.2f}% for you to break even.
 
     - **Unwinding Immediately**: If the price of {collateral_token_name}/{loan_token_name} stays flat, or if you decide to unwind your position immediately, your RoI will be {roi_unchanged:.2f}%.
 
-    - **Total Loss**: A drop to {total_loss_price_change:.2f}% in the price of {collateral_token_name}/{loan_token_name} will result in a complete loss.
+    - **Total Loss**: If the price of {collateral_token_name}/{loan_token_name} drops and stays below {total_loss_price_change:.2f}% throughout the entire loan duration, your leveraged {collateral_token_name} collateral will be worth less than your {loan_token_name} debt. In this situation, it would be rational for you to choose not to repay, in which case you'll suffer a 100% loss.
     """)
 
 st.write(f"""### How Does Looping Work?""")
@@ -493,7 +469,7 @@ tokens = [
     loan_token_name
 ]
 
-colors = ['gray', 'gray', 'green', 'red', 'green', 'red', 'blue']
+colors = ['lightgray', 'lightgray', 'lightgreen', 'lightcoral', 'lightgreen', 'lightcoral', 'lightblue']
 
 # Create the bar chart
 fig, ax = plt.subplots(figsize=(12, 7))
@@ -525,7 +501,7 @@ ax.set_ylim(0, max(values)*1.2)  # Add some space at the top for annotations
 st.pyplot(fig)
 
 
-st.write(f"""Note: You can share the calculated scenario using this link""")
+st.write(f"""💡You can share the calculated scenario using this link:""")
 input_values = {
     "collateral_token_name": collateral_token_name,
     "user_init_coll_amount": user_init_coll_amount,
@@ -542,12 +518,15 @@ input_values = {
     "gas_used": gas_used,
     "gas_price": gas_price,
     "eth_price": eth_price,
+    "price_move_from": price_change_range[0],
+    "price_move_to": price_change_range[1],
     "expected_price_move_coll_token": expected_price_move_coll_token
 }
 
 # Convert the dictionary to a query string
-query_string2 = "&".join([f"{key}={value}" for key, value in input_values.items()])
-shareable_link2 = base_url + "?" + query_string2
+base_url = "one-click-looping.streamlit.app/"  # Change this to your app's base URL
+query_string = "&".join([f"{key}={value}" for key, value in input_values.items()])
+shareable_link = base_url + "?" + query_string
 
 # Display the shareable link in a code block
-st.code(shareable_link2)
+st.code(shareable_link)
