@@ -156,20 +156,20 @@ total_loss_price_change = bisect(calc_roi2, -1., 2., args=(-1., current_price_co
 
 st.write(f"""
 ### What is One-Click Looping?
-With MYSO's one-click looping, you can create a leveraged position in {collateral_token_name} against {loan_token_name} up to a ratio of {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x, based on an LTV (Loan to Value) of {ltv*100:.1f}%. Instead of consecutively pledging {collateral_token_name} to borrow {loan_token_name}, swapping it for {collateral_token_name}, and repeating the process, one-click looping lets you handle all these steps in one efficient transaction. Unlike perpetuals, there's no risk of liquidation. This ensures that even if the price of {collateral_token_name}/{loan_token_name} plummets, you maintain the full upside potential. However, exercise caution: if the price of {collateral_token_name}/{loan_token_name} decreases and remains below {total_loss_price_change:.2f}% for the entire loan duration, your leveraged {collateral_token_name} position will be worth less than the debt you owe. As a result, you won't be able to recover your position and could suffer a total, 100% loss.
+With MYSO's one-click looping, you can create a leveraged position in {collateral_token_name} against {loan_token_name} up to a ratio of {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x (assuming {ltv*100:.1f}% LTV). Instead of consecutively pledging {collateral_token_name} to borrow {loan_token_name}, swapping it for {collateral_token_name}, and repeating the process, one-click looping lets you handle all these steps in one efficient transaction.\n\nAnd unlike perpetuals, there's no risk of liquidation. This ensures that even if the price of {collateral_token_name}/{loan_token_name} plummets, you maintain the full upside potential if the price rebounds again. However, exercise caution: if the price of {collateral_token_name}/{loan_token_name} decreases and remains below {total_loss_price_change:.2f}% for the entire loan duration, your leveraged {collateral_token_name} position will be worth less than the debt you owe. As a result, you won't be able to recover your position without additional {loan_token_name} capital and could suffer a total, 100% loss.
 """)
 
 st.write(f"""
 ### What Can I Earn With Looping?
-Below you can see potential outcomes when looping with MYSO. Your RoI will depend on the realized price change of {collateral_token_name}/{loan_token_name} during the loan lifetime (currently assumed at {tenor} days, see LTV in loan terms input).
+Below you can see potential outcomes when looping with MYSO. Your RoI will depend on the realized price change of {collateral_token_name}/{loan_token_name} during the loan lifetime.
 """)
 # Use a range slider to define the range for hypothetical price changes
 price_change_range = st.slider(
-    f"**Define your expected price range for {collateral_token_name}/{loan_token_name} over the upcoming {tenor} days:**", 
+    f"**Define your expected from/to price range for {collateral_token_name}/{loan_token_name} over the upcoming {tenor} days:**", 
     min_value=-100.,  # you can adjust this lower limit based on your requirements
     max_value=100.,   # you can adjust this upper limit based on your requirements
     value=(get_param_value("price_move_from", default_price_move_from, float), get_param_value("price_move_to", default_price_move_to, float)),
-    format="%.1f%%"  # Added the % sign after the float format
+    format="%.0f%%"  # Added the % sign after the float format
 )
 
 rel_price_changes = []
@@ -196,7 +196,7 @@ break_even_price_change = bisect(calc_roi2, -1., 2., args=(.0, current_price_col
 fig, ax = plt.subplots(figsize=(10, 5))
 ax.axhline(y=0, color='black', linestyle='-', lw=.5)
 ax.axvline(x=0, color='black', linestyle='-', lw=.5)
-ax.plot([x*100 for x in rel_price_changes], [x*100 for x in RoIs], label=f'RoI Looping {collateral_token_name}', color='blue')
+ax.plot([x*100 for x in rel_price_changes], [x*100 for x in RoIs], label=f'RoI Looping {collateral_token_name}', color='deepskyblue')
 ax.plot([x*100 for x in rel_price_changes], [x*100 for x in rel_price_changes], label=f'RoI Buy&Hold {collateral_token_name}', linestyle='-', color='gray')
 ax.fill_between([x*100 for x in rel_price_changes], [x*100 for x in RoIs], [0 for _ in rel_price_changes], where=[roi > 0 for roi, hold in zip(RoIs, rel_price_changes)], color='lightgreen', label='Profit')
 ax.fill_between([x*100 for x in rel_price_changes], [x*100 for x in RoIs], [0 for _ in rel_price_changes], where=[roi <= 0 for roi, hold in zip(RoIs, rel_price_changes)], color='lightcoral', label='Loss')
@@ -207,7 +207,8 @@ if price_change_range[0] < break_even_price_change and break_even_price_change <
     tmp = f"+{break_even_price_change:.2f}" if break_even_price_change > 0 else f"{break_even_price_change:.2f}"
     ax.annotate(f'If price {tmp}%:\nBreak-even', 
                 (break_even_price_change, min(RoIs)*100), 
-                textcoords="offset points", 
+                textcoords="offset points",
+                color="green",
                 xytext=(0, -90),  # This offsets the annotation below the x-axis
                 ha='center',
                 va='top',  # This aligns the top of the text to the xytext
@@ -220,6 +221,7 @@ if price_change_range[0] < total_loss_price_change and total_loss_price_change <
     ax.annotate(f'If price {tmp}%:\nFull Loss', 
                 (total_loss_price_change, min(RoIs)*100), 
                 textcoords="offset points", 
+                color="red",
                 xytext=(0, -60),  # This offsets the annotation below the x-axis
                 ha='center',
                 va='top',  # This aligns the top of the text to the xytext
@@ -228,15 +230,16 @@ if price_change_range[0] < total_loss_price_change and total_loss_price_change <
 tmp = f"+{roi_unchanged:.2f}" if roi_unchanged > 0 else f"{roi_unchanged:.2f}"
 if price_change_range[0] < 0 and 0 < price_change_range[1]:   
     # Add vertical dotted line
-    ax.axhline(y=roi_unchanged, color='orange', linestyle='--', lw=0.8)
-    ax.plot(0, roi_unchanged, "o", color="orange")
+    ax.axhline(y=roi_unchanged, color='darkblue', linestyle='--', lw=0.8)
+    ax.plot(0, roi_unchanged, "o", color="darkblue")
     ax.annotate(f'If price flat:\n{tmp}% RoI',
                 (price_change_range[0], roi_unchanged), 
                 textcoords="offset points", 
+                color="darkblue",
                 xytext=(-65, 0),  # This offsets the annotation to the left of the y-axis
                 ha='right',
                 va='center',  # This aligns the center of the text to the xytext
-                arrowprops=dict(arrowstyle="->", linestyle='dotted', lw=0.8, color='orange'))
+                arrowprops=dict(arrowstyle="->", linestyle='dotted', lw=0.8, color='darkblue'))
 ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
 ax.set_xlabel(f'Price Change of {collateral_token_name}/{loan_token_name} (%)')
@@ -321,7 +324,7 @@ st.write(f"""
 
     - **Unwinding Immediately**: If the price of {collateral_token_name}/{loan_token_name} stays flat, or if you decide to unwind your position immediately, your RoI will be {roi_unchanged:.2f}%.
 
-    - **Total Loss**: If the price of {collateral_token_name}/{loan_token_name} drops and stays below {total_loss_price_change:.2f}% throughout the entire loan duration, your leveraged {collateral_token_name} collateral will be worth less than your {loan_token_name} debt. In this situation, it would be rational for you to choose not to repay, in which case you'll suffer a 100% loss.
+    - **Total Loss**: If the price of {collateral_token_name}/{loan_token_name} drops and stays below {total_loss_price_change:.2f}% throughout the entire loan duration, your leveraged {collateral_token_name} collateral will be worth less than your {loan_token_name} debt. In this situation, it would be rational for you to not repay, in which case you'll suffer a 100% loss.
     """)
 
 st.write(f"""### How Does Looping Work?""")
@@ -355,21 +358,22 @@ subheaders = [
 # Create data with the new structure
 data = {
     'Description': [
-        f'Your initial {collateral_token_name} position',
-        f'{loan_token_name} Flashborrow to open', 
-        f"{loan_token_name} sold on DEX",
-        f"{collateral_token_name} received from DEX",
-        f'Your total {collateral_token_name} position',
-        f'Fees to MYSO (Upfront and Protocol)',
+        f'Your Initial {collateral_token_name} Position',
+        f'{loan_token_name} Flashborrow to Open', 
+        f"{loan_token_name} Sold on DEX",
+        f"{collateral_token_name} Received from DEX",
+        f'Your Total {collateral_token_name} Position',
+        f'Upfront Fee to Lender',
+        f'MYSO Protocol Fee',
         'Final Pledged Amount',
         'Leverage',
-        f"{collateral_token_name} Flashborrow to close",
-        f"{collateral_token_name} sold on DEX",
-        f"{loan_token_name} received from DEX",
+        f"{collateral_token_name} Flashborrow To Close",
+        f"{collateral_token_name} Sold on DEX",
+        f"{loan_token_name} Received from DEX",
         f"Repayment of {loan_token_name}",
         f"Remaining {loan_token_name} after Repayment",
         f"Final RoI",
-        f"Gas costs",
+        f"Gas Costs",
         f"Final RoI (net gas costs)",
     ],
     'Open Position Amount': [
@@ -378,7 +382,8 @@ data = {
         f"-{sold_on_dex:,.4f} {loan_token_name} (${sold_on_dex*current_price_loan_token:,.2f})",
         f"+{received_from_dex:,.4f} {collateral_token_name} (${received_from_dex*current_price_coll_token:,.2f})",
         f"-{combined_pledge:,.4f} {collateral_token_name} (${combined_pledge*current_price_coll_token:,.2f})",
-        f"-{upfront_fee_abs + myso_fee_abs:,.4f} {collateral_token_name} (${(upfront_fee_abs + myso_fee_abs)*current_price_coll_token:,.2f})",
+        f"-{upfront_fee_abs:,.4f} {collateral_token_name} (${(upfront_fee_abs)*current_price_coll_token:,.2f})",
+        f"-{myso_fee_abs:,.4f} {collateral_token_name} (${(myso_fee_abs)*current_price_coll_token:,.2f})",
         f"+{final_pledge_and_reclaimable:,.4f} {collateral_token_name} (${final_pledge_and_reclaimable*current_price_coll_token:,.2f})",
         f"{final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x",
         "-",
@@ -391,6 +396,7 @@ data = {
         "-"
     ],
     'Close Position Amount': [
+        "-",
         "-",
         "-",
         "-",
@@ -420,7 +426,7 @@ st.write(f"""
   
 - **Opening Leveraged Position:** Through looping, you leverage this position to {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x its original size.
 
-- **Unwinding Position:** If the price change unfolds as anticipated, it would be rational for you to {f"repay and unwind your looping position, given that your {collateral_token_name} leveraged collateral exceeds your {loan_token_name} debt" if final_amount_after_close2 > 0 else f"default and let your looping position expire, as your {collateral_token_name} leveraged collateral is valued less than your {loan_token_name} debt owed"}.
+- **Unwinding Position:** If the price change unfolds as anticipated, it would be rational for you to {f"repay and unwind your looping position, given that your {collateral_token_name} leveraged collateral is worth more than your {loan_token_name} debt" if final_amount_after_close2 > 0 else f"default and let your looping position expire without repaying, as your {collateral_token_name} leveraged collateral is worth less than your {loan_token_name} debt"}.
 
 - **Final Position:** Consequently, your end position would be {final_amount_after_close2:,.2f} {loan_token_name} (equivalent to ${final_amount_after_close2*final_price_loan_token:,.2f}), yielding an RoI of {final_amount_after_close2*final_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%.
 """)
