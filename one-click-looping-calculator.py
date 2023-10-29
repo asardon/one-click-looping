@@ -155,8 +155,8 @@ def calc_roi2(coll_usd_price_change, target_roi, current_price_coll_token, curre
 total_loss_price_change = bisect(calc_roi2, -1., 2., args=(-1., current_price_coll_token, current_price_loan_token, final_pledge_and_reclaimable, owed_repayment, dex_slippage, dex_swap_fee, gas_usd_cost)) * 100
 
 st.write(f"""
-    ### What is Looping?
-Using MYSO to loop allows you to leverage {collateral_token_name} against {loan_token_name} up to a ratio of {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x, based on an LTV (Loan to Value) of {ltv*100:.1f}%. In essence, you're establishing a leveraged call option position. Unlike perpetuals, there's no risk of liquidation. This means that even if the price of {collateral_token_name}/{loan_token_name} drops sharply, you still retain the full upside potential. However, caution is advised. If the price of {collateral_token_name}/{loan_token_name} decreases and remains below {total_loss_price_change:.2f}% throughout the entire duration of the loan, your leveraged {collateral_token_name} position will be worth less than the debt you owe. Consequently, you won't be able to recover your position and will face a complete, 100% loss.
+### What is One-Click Looping?
+With MYSO's one-click looping, you can create a leveraged position in {collateral_token_name} against {loan_token_name} up to a ratio of {final_pledge_and_reclaimable/user_init_coll_amount:,.2f}x, based on an LTV (Loan to Value) of {ltv*100:.1f}%. Instead of consecutively pledging {collateral_token_name} to borrow {loan_token_name}, swapping it for {collateral_token_name}, and repeating the process, one-click looping lets you handle all these steps in one efficient transaction. Unlike perpetuals, there's no risk of liquidation. This ensures that even if the price of {collateral_token_name}/{loan_token_name} plummets, you maintain the full upside potential. However, exercise caution: if the price of {collateral_token_name}/{loan_token_name} decreases and remains below {total_loss_price_change:.2f}% for the entire loan duration, your leveraged {collateral_token_name} position will be worth less than the debt you owe. As a result, you won't be able to recover your position and could suffer a total, 100% loss.
 """)
 
 st.write(f"""
@@ -326,11 +326,9 @@ st.write(f"""
 
 st.write(f"""### How Does Looping Work?""")
 st.write(f"""
-Looping with MYSO enables users to create a leveraged position, amplifying the potential returns of their base assets. Below you can see the individual steps involved in the looping process, illuminating what occurs behind the scenes. 
+For a more detailed scenario breakdown, you can input the {collateral_token_name}/{loan_token_name} price change you expect over the loan duration of {tenor} days.""")
 
-Enter your expected price appreciation for {collateral_token_name} compared to {loan_token_name} over the loan duration of {tenor} days below. You'll receive a detailed breakdown tailored to that specific price scenario.""")
-
-expected_price_move_coll_token = st.number_input(f"**Expected {collateral_token_name}/{loan_token_name} price change (in next {tenor} days):**", min_value=-1.0, max_value=10.0, value=get_param_value("expected_price_move_coll_token", default_expected_price_move_coll_token, float), format="%.4f")
+expected_price_move_coll_token = st.number_input(f"**Expected {collateral_token_name}/{loan_token_name} price change:**", min_value=-1.0, max_value=10.0, value=get_param_value("expected_price_move_coll_token", default_expected_price_move_coll_token, float), format="%.4f")
 
 final_price_coll_token = current_price_coll_token * (1 + expected_price_move_coll_token)
 final_price_loan_token = current_price_loan_token
@@ -406,9 +404,9 @@ data = {
         f"+{received_from_dex2:,.4f} {loan_token_name} (${received_from_dex2*current_price_loan_token:,.2f})",
         f"-{owed_repayment:,.4f} {loan_token_name} (${owed_repayment*current_price_loan_token:,.2f})",
         f"+{final_amount_after_close2:,.4f} {loan_token_name} (${final_amount_after_close2*current_price_loan_token:,.2f})",
-        f"{final_amount_after_close2*current_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%",
+        f"{final_amount_after_close2*current_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}% ({(final_amount_after_close2*current_price_loan_token/(user_init_coll_amount*current_price_coll_token)*100-100)*365/tenor:,.2f}% p.a.)",
         f"-${gas_usd_cost:,.2f}",
-        f"{(final_amount_after_close2*current_price_loan_token-gas_usd_cost)/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}%"
+        f"{(final_amount_after_close2*current_price_loan_token-gas_usd_cost)/(user_init_coll_amount*current_price_coll_token)*100-100:,.2f}% ({((final_amount_after_close2*current_price_loan_token-gas_usd_cost)/(user_init_coll_amount*current_price_coll_token)*100-100)*365/tenor:,.2f}% p.a.)"
     ]
 }
 
