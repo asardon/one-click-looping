@@ -1,8 +1,9 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.optimize import bisect, minimize
 import numpy as np
+from scipy.optimize import bisect, minimize
+from urllib.parse import urlencode
 
 def find_flashloan_amount(flashloan_amount, user_init_coll_amount, cross_price, ltv, dex_slippage, dex_swap_fee, upfront_fee):
     sold_on_dex = flashloan_amount
@@ -88,6 +89,7 @@ def get_param_value(key, default, data_type):
         return default
 
 params = st.experimental_get_query_params()
+params = params if params is not None else {}
 default_collateral_token_name = "WMNT"
 default_user_init_coll_amount = 100.
 default_current_price_coll_token = 0.38
@@ -529,7 +531,7 @@ input_values = {
 
 # Convert the dictionary to a query string
 base_url = "one-click-looping.streamlit.app/"  # Change this to your app's base URL
-query_string = "&".join([f"{key}={value}" for key, value in input_values.items()])
+query_string = urlencode(input_values)
 shareable_link = base_url + "?" + query_string
 
 # Display the shareable link in a code block
