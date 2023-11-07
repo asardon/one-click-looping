@@ -123,16 +123,22 @@ with st.sidebar:
         st.code(f"1 {collateral_token_name} = {current_price_coll_token/current_price_loan_token} {loan_token_name}")
 
     with st.expander("**Your Loan Terms**", expanded=True):
-        ltv = st.number_input("LTV", min_value=0.01, max_value=1.0, value=get_param_value("ltv", default_ltv, float), format="%.4f")
+        ltv = st.number_input("LTV", min_value=0.01, max_value=1.0, value=get_param_value("ltv", default_ltv, float), format="%.4f",
+                            help="Loan to Value ratio as a decimal. E.g., enter 0.2 for 20%.")
         tenor = st.number_input("Tenor* (in days)", min_value=1, max_value=365, value=get_param_value("tenor", default_tenor, int))
-        apr = st.number_input("APR", min_value=0.0, max_value=1.0, value=get_param_value("apr", default_apr, float), format="%.4f")
-        upfront_fee = st.number_input("Upfront Fee", min_value=0.0, max_value=1.0, value=get_param_value("upfront_fee", default_upfront_fee, float), format="%.4f")
-        myso_fee = st.number_input("MYSO Protocol Fee", min_value=0.0, value=get_param_value("myso_fee", default_myso_fee, float), max_value=1.0, format="%.4f")
+        apr = st.number_input("APR", min_value=0.0, max_value=1.0, value=get_param_value("apr", default_apr, float), format="%.4f",
+                            help="Annual Percentage Rate as a decimal. E.g., enter 0.1 for 10%.")
+        upfront_fee = st.number_input("Upfront Fee", min_value=0.0, max_value=1.0, value=get_param_value("upfront_fee", default_upfront_fee, float), format="%.4f",
+                                    help="Upfront fee as a decimal. E.g., enter 0.01 for 1%.")
+        myso_fee = st.number_input("MYSO Protocol Fee", min_value=0.0, value=get_param_value("myso_fee", default_myso_fee, float), max_value=1.0, format="%.4f",
+                                help="MYSO protocol fee as a decimal. E.g., enter 0.005 for 0.5%.")
 
     with st.expander("**Advanced: Input DEX Assumptions**"):
-        dex_slippage = st.number_input("DEX Slippage", min_value=0.0, max_value=1.0, value=get_param_value("dex_slippage", default_dex_slippage, float), format="%.4f")
-        dex_swap_fee = st.number_input("DEX Swap Fee", min_value=0.0, max_value=1.0, value=get_param_value("dex_swap_fee", default_dex_swap_fee, float), format="%.4f")
-
+        dex_slippage = st.number_input("DEX Price Impact", min_value=0.0, max_value=1.0, value=get_param_value("dex_slippage", default_dex_slippage, float), format="%.4f",
+                                    help="DEX price impact as a decimal. E.g., enter 0.0008 for 0.08% price impact on the exchange.")
+        dex_swap_fee = st.number_input("DEX Swap Fee", min_value=0.0, max_value=1.0, value=get_param_value("dex_swap_fee", default_dex_swap_fee, float), format="%.4f",
+                                   help="DEX swap fee as a decimal. E.g., enter 0.0005 for a 0.05% swap fee on the exchange.")
+    
     with st.expander("**Advanced: Input Gas Price Assumptions**"):
         gas_used = st.number_input("Gas Used (full round trip)", min_value=0, max_value=100000000, value=get_param_value("gas_used", default_gas_used, int))
         gas_price = st.number_input("Gas Price (GWei)", min_value=0, max_value=100, value=get_param_value("gas_price", default_gas_price, int))
